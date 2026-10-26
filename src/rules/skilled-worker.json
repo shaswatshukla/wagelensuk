@@ -1,0 +1,32 @@
+{
+  "version": "0.1-research",
+  "lastVerified": "2026-10-26",
+  "effectiveDate": "2026-04-08",
+  "rules": [
+    {
+      "id": "hourly",
+      "description": "Eligible pay for each hour worked",
+      "paragraph": "SW 14.3B(a)",
+      "effectiveDate": "2026-04-08",
+      "status": "PRIMARY-CONFIRMED",
+      "source": "https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-worker",
+      "parameters": {}
+    },
+    {
+      "id": "window",
+      "description": "Aligned salary window screening; arbitrary boundaries require review",
+      "paragraph": "SW 14.3B(b)–(d)",
+      "effectiveDate": "2026-04-08",
+      "status": "PRIMARY-CONFIRMED",
+      "source": "https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-worker",
+      "parameters": {
+        "monthlyMonths": 3,
+        "frequentWeeks": 12,
+        "irregularWeeks": 17,
+        "weeksInYear": 52,
+        "monthsInYear": 12,
+        "daysInWeek": 7
+      }
+    }
+  ]
+}

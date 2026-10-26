@@ -1,0 +1,29 @@
+{
+  "name": "wagelensuk",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc --noEmit && vite build",
+    "test": "vitest run",
+    "coverage": "vitest run --coverage",
+    "ci:build": "pnpm coverage && pnpm build",
+    "test:browser": "node scripts/browser-check.cjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@vitest/coverage-v8": "^3.2.0",
+    "lighthouse": "^13.5.0",
+    "playwright-core": "^1.64.1",
+    "prettier": "^3.9.10",
+    "typescript": "~5.9.3",
+    "vite": "^7.1.0",
+    "vitest": "^3.2.0"
+  },
+  "dependencies": {
+    "pdfjs-dist": "^6.4.299",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
+  },
+  "packageManager": "pnpm@11.25.0"
+}
