@@ -67,6 +67,25 @@ const fs = require("node:fs");
     requests.push({ url: r.url(), method: r.method(), body: r.postData() }),
   );
   await page.getByRole("button", { name: /Try sample data/ }).click();
+  if ((await page.locator(".worker-group").count()) !== 3)
+    throw Error("Results must be grouped into three workers");
+  await page
+    .getByRole("columnheader", { name: "Salary-window check" })
+    .first()
+    .waitFor();
+  if (
+    !(await page.locator(".review-reason").allTextContents()).includes(
+      "Potential hourly pay gap",
+    )
+  )
+    throw Error("Results must explain why review is needed");
+  const workerSummary = page.locator(".worker-group > summary").first();
+  await workerSummary.click();
+  if (
+    (await page.locator(".worker-group").first().getAttribute("open")) !== null
+  )
+    throw Error("Worker group did not collapse");
+  await workerSummary.click();
   await page.getByRole("button", { name: "Recheck data" }).click();
   if (
     !(await page.locator("#recheck-status").innerText()).includes("Rechecked")
@@ -246,6 +265,16 @@ const fs = require("node:fs");
   await page.locator("#confirm-values").check();
   await page.getByRole("button", { name: "Review payroll" }).click();
   await page.locator(".worker-ref").filter({ hasText: "E-PDF" }).waitFor();
+  await page.getByRole("button", { name: "Clear data", exact: true }).click();
+  await page.locator("#file").setInputFiles("samples/wagelens-demo.csv");
+  await page.locator("#confirm-values").check();
+  await page.getByRole("button", { name: "Review payroll" }).click();
+  const salaryGroup = page.locator(".worker-group").filter({ hasText: "DEMO-003" });
+  if (!(await salaryGroup.innerText()).includes("£1,000.00 potential gap"))
+    throw Error("Salary-window gap must be visible without expanding calculations");
+  if (!(await salaryGroup.innerText()).includes("Potential salary-window gap"))
+    throw Error("Salary-window review reason missing");
+  await page.screenshot({ path: "test-results/wagelens-grouped-demo.png", fullPage: true });
   const allowedAssets = new Set(
     fs
       .readdirSync("dist/assets")

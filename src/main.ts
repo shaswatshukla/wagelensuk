@@ -1,5 +1,10 @@
 import "./style.css";
-import { calculationParameters, findingGuidance, structuredReport, officialLinks } from "./guidance";
+import {
+  calculationParameters,
+  findingGuidance,
+  structuredReport,
+  officialLinks,
+} from "./guidance";
 import { mountConfirmation } from "./confirmation";
 import {
   preloadWorkbookTools,
@@ -253,6 +258,26 @@ function renderSheetPicker(imported: PayrollImport, name: string) {
     render();
   });
 }
+function windowLabel(r: Result): string {
+  const finding = r.windowFinding;
+  if (!finding || finding.status === "REVIEW")
+    return "More evidence / review needed";
+  if (finding.status === "FAIL")
+    return finding.shortfallAmount
+      ? money(finding.shortfallAmount) + " potential gap"
+      : "Potential salary gap";
+  return "No shortfall in aligned window";
+}
+function reviewReason(r: Result): string {
+  if (r.shortfallAmount && r.windowFinding?.status === "FAIL")
+    return "Hourly and salary-window gaps";
+  if (r.shortfallAmount) return "Potential hourly pay gap";
+  if (r.windowFinding?.status === "FAIL") return "Potential salary-window gap";
+  if (!r.windowFinding) return r.explanation;
+  if (r.windowFinding.status === "REVIEW")
+    return "Window evidence or scope needs review";
+  return "Full boundaries and exceptions need review";
+}
 function renderResults() {
   const el = document.querySelector("#results");
   if (!el) return;
@@ -260,28 +285,42 @@ function renderResults() {
     el.innerHTML = "";
     return;
   }
-  const workers = new Set(results.map((r) => r.worker)).size;
+  const groups = new Map<string, Result[]>();
+  const resultIndices = new Map<Result, number>();
+  results.forEach((r, i) => {
+    const group = groups.get(r.worker) ?? [];
+    group.push(r);
+    groups.set(r.worker, group);
+    resultIndices.set(r, i);
+  });
+  const workers = groups.size;
   const issues = results.filter((r) => r.shortfallAmount).length;
   el.innerHTML = `<section class="results-section" aria-labelledby="results-title"><div class="section-head"><div><h2 id="results-title">Your payroll, in focus. <span class="tag">${sample ? "SAMPLE DATA" : "LOCAL FILE"}</span></h2><p>${esc(fileName)} · Pay-period screening preview</p></div><div class="report-actions"><button class="secondary" id="recheck">↻ Recheck data</button><button class="secondary" id="export-json">Export JSON</button><button class="secondary" id="export">${icon("download", 12)} Export CSV</button><button class="secondary" id="print">${icon("file", 12)} Print / save PDF</button><button class="secondary" id="clear">Clear data</button></div></div><div class="summary"><div class="stat"><div class="stat-top">Workers screened ${icon("file", 12)}</div><strong>${workers.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Pay periods ${icon("check", 12)}</div><strong>${results.length.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Potential hourly shortfalls ${icon("info", 12)}</div><strong class="red">${issues.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Need full review ${icon("info", 12)}</div><strong class="amber">${results
     .filter((r) => r.status === "REVIEW")
     .length.toString()
-    .padStart(
-      2,
-      "0",
-    )}</strong></div></div><div class="table-shell" tabindex="0" role="region" aria-label="Scrollable pay-period findings"><table><caption class="file-note">Pay-period findings — expand each row for the calculation and next step</caption><thead><tr><th scope="col">Worker reference</th><th scope="col">Pay period</th><th scope="col">Basic pay</th><th scope="col">Hourly screen</th><th scope="col">Overall finding</th><th scope="col">Details</th></tr></thead><tbody>${results
-    .map(
-      (r, i) =>
-        `<tr><td><div class="worker-ref"><span class="avatar">${String(i + 1).padStart(2, "0")}</span>${esc(r.worker)}</div></td><td>${esc(r.period)}</td><td>${money(r.pay)}</td><td class="${r.shortfallAmount ? "red" : ""}">${r.shortfallAmount ? money(r.shortfallAmount) + " potential gap" : r.windowFinding ? "No shortfall detected*" : "Not screened"}</td><td><span class="status">${icon("info", 11)} Review</span></td><td><button class="detail-btn" data-detail="${i}" aria-expanded="false" aria-controls="detail-${i}" aria-label="Show findings for ${esc(r.worker)}">⌄</button></td></tr><tr class="detail-row" id="detail-${i}" hidden><td colspan="6"><strong>${esc(findingGuidance(r).heading)} · ${esc(findingGuidance(r).references.join("; "))}</strong><br>${esc(r.explanation)}${r.windowFinding ? `<br><strong>Aligned window: ${r.windowFinding.status}</strong> · ${esc(r.windowFinding.explanation)}` : ""}<br><strong>Suggested mitigation / next steps:</strong><ol>${findingGuidance(
-          r,
+    .padStart(2, "0")}</strong></div></div>${[...groups]
+    .map(([worker, workerResults]) => {
+      const hourlyGaps = workerResults.filter((r) => r.shortfallAmount).length;
+      const latest = workerResults[workerResults.length - 1];
+      const windowGaps = workerResults.filter(
+        (r) => r.windowFinding?.status === "FAIL",
+      ).length;
+      return `<details class="worker-group" open><summary><strong class="worker-name">${esc(worker)}</strong><span>${workerResults.length} pay periods</span><span class="${hourlyGaps ? "red" : ""}">Hourly: ${hourlyGaps ? `${hourlyGaps} potential gaps` : workerResults.every((r) => r.windowFinding) ? "No shortfall detected" : "Review required"}</span><span class="${windowGaps ? "red" : ""}">Salary window: ${windowGaps ? `${windowGaps} potential gaps` : esc(windowLabel(latest))}</span><span class="worker-toggle">Pay periods ⌄</span></summary><div class="table-shell" tabindex="0" role="region" aria-label="Scrollable pay-period findings"><table><caption class="file-note">Pay-period checks — hourly and salary-window findings are separate</caption><thead><tr><th scope="col">Worker reference</th><th scope="col">Pay period</th><th scope="col">Basic pay</th><th scope="col">Hourly screen</th><th scope="col">Salary-window check</th><th scope="col">Review reason</th><th scope="col">Details</th></tr></thead><tbody>${workerResults
+        .map(
+          (r) =>
+            `<tr><td><div class="worker-ref"><span class="avatar">${String(resultIndices.get(r)! + 1).padStart(2, "0")}</span>${esc(r.worker)}</div></td><td>${esc(r.period)}</td><td>${money(r.pay)}</td><td class="${r.shortfallAmount ? "red" : ""}">${r.shortfallAmount ? money(r.shortfallAmount) + " potential gap" : r.windowFinding ? "No shortfall detected*" : "Not screened"}</td><td class="${r.windowFinding?.status === "FAIL" ? "red" : ""}">${esc(windowLabel(r))}</td><td><span class="status">${icon("info", 11)} Review</span><small class="review-reason">${esc(reviewReason(r))}</small></td><td><button class="detail-btn" data-detail="${resultIndices.get(r)!}" aria-expanded="false" aria-controls="detail-${resultIndices.get(r)!}" aria-label="Show findings for ${esc(r.worker)}">View calculation ⌄</button></td></tr><tr class="detail-row" id="detail-${resultIndices.get(r)!}" hidden><td colspan="7"><strong>${esc(findingGuidance(r).heading)} · ${esc(findingGuidance(r).references.join("; "))}</strong><br>${esc(r.explanation)}${r.windowFinding ? `<br><strong>Aligned window: ${r.windowFinding.status}</strong> · ${esc(r.windowFinding.explanation)}` : ""}<br><strong>Suggested mitigation / next steps:</strong><ol>${findingGuidance(
+              r,
+            )
+              .actions.map((action) => `<li>${esc(action)}</li>`)
+              .join(
+                "",
+              )}</ol><a href="${officialLinks.skilledWorker}" target="_blank" rel="noreferrer">Immigration rule source ↗</a> · <a href="${officialLinks.reporting}" target="_blank" rel="noreferrer">Sponsor reporting duties ↗</a>${r.shortfallAmount ? "<br>Consider whether a reportable salary reduction has occurred; the reporting clock is not calculated in this preview." : ""}<br>Rule version ${rules.version} · Last verified ${rules.lastVerified} · Decision support, not legal advice.</td></tr>`,
         )
-          .actions.map((action) => `<li>${esc(action)}</li>`)
-          .join(
-            "",
-          )}</ol><a href="${officialLinks.skilledWorker}" target="_blank" rel="noreferrer">Immigration rule source ↗</a> · <a href="${officialLinks.reporting}" target="_blank" rel="noreferrer">Sponsor reporting duties ↗</a>${r.shortfallAmount ? "<br>Consider whether a reportable salary reduction has occurred; the reporting clock is not calculated in this preview." : ""}<br>Rule version ${rules.version} · Last verified ${rules.lastVerified} · Decision support, not legal advice.</td></tr>`,
-    )
+        .join("")}</tbody></table></div></details>`;
+    })
     .join(
       "",
-    )}</tbody></table></div><details class="match-details calculation-method"><summary>How these findings are calculated</summary><p>Predefined rules, not AI: confirmed basic pay is compared with actual hours × your supplied hourly going rate. Complete aligned monthly windows compare with annual requirement × ${calculationParameters.monthlyMonths}/${calculationParameters.monthsInYear}; more frequent pay uses ${calculationParameters.frequentWeeks}/${calculationParameters.weeksInYear}. Integer-pence and rational arithmetic avoid floating-point money comparisons. Missing evidence and unresolved exceptions remain REVIEW.</p><p>Recheck data repeats the calculation using the ruleset shown below. It does not fetch new Home Office rules or retrieve amended payroll. Import a new export when payroll changes; rule updates require a reviewed release.</p><a href="#/rules">Rules, version and limitations →</a> · <a href="${officialLinks.hmrc}" target="_blank" rel="noreferrer">HMRC payroll reporting guidance ↗</a><p>HMRC guidance concerns payroll reporting. Skilled Worker salary requirements come from the Home Office Immigration Rules.</p></details><div id="recheck-status" class="paste-help" role="status"></div><div class="result-note">${icon("info", 13)}<span>*This preview screens basic pay against the supplied hourly rate. Aligned window checks appear in row details; arbitrary boundaries and exceptions require further review. Every overall finding remains REVIEW. Decision support, not legal advice.</span></div><div class="version-line"><span>RULESET ${rules.version} · LAST VERIFIED ${rules.lastVerified} · SOLICITOR REVIEW PENDING</span><a href="#/rules">See how the rules are interpreted ↗</a><span>Generated ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })} UK time</span></div></section>`;
+    )}<details class="match-details calculation-method"><summary>How these findings are calculated</summary><p>Predefined rules, not AI: confirmed basic pay is compared with actual hours × your supplied hourly going rate. Complete aligned monthly windows compare with annual requirement × ${calculationParameters.monthlyMonths}/${calculationParameters.monthsInYear}; more frequent pay uses ${calculationParameters.frequentWeeks}/${calculationParameters.weeksInYear}. Integer-pence and rational arithmetic avoid floating-point money comparisons. Missing evidence and unresolved exceptions remain REVIEW.</p><p>Recheck data repeats the calculation using the ruleset shown below. It does not fetch new Home Office rules or retrieve amended payroll. Import a new export when payroll changes; rule updates require a reviewed release.</p><a href="#/rules">Rules, version and limitations →</a> · <a href="${officialLinks.hmrc}" target="_blank" rel="noreferrer">HMRC payroll reporting guidance ↗</a><p>HMRC guidance concerns payroll reporting. Skilled Worker salary requirements come from the Home Office Immigration Rules.</p></details><div id="recheck-status" class="paste-help" role="status"></div><div class="result-note">${icon("info", 13)}<span>*This preview screens basic pay against the supplied hourly rate. Aligned salary-window checks are shown separately; arbitrary boundaries and exceptions require further review. Every overall finding remains REVIEW. Decision support, not legal advice.</span></div><div class="version-line"><span>RULESET ${rules.version} · LAST VERIFIED ${rules.lastVerified} · SOLICITOR REVIEW PENDING</span><a href="#/rules">See how the rules are interpreted ↗</a><span>Generated ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })} UK time</span></div></section>`;
   el.querySelectorAll<HTMLButtonElement>("[data-detail]").forEach((b) =>
     b.addEventListener("click", () => {
       const row = document.querySelector<HTMLTableRowElement>(
@@ -289,7 +328,7 @@ function renderResults() {
       )!;
       row.hidden = !row.hidden;
       b.setAttribute("aria-expanded", String(!row.hidden));
-      b.textContent = row.hidden ? "⌄" : "⌃";
+      b.textContent = row.hidden ? "View calculation ⌄" : "Hide calculation ⌃";
     }),
   );
   el.querySelector("#clear")?.addEventListener("click", () => {
