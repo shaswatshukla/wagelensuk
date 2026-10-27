@@ -1,5 +1,7 @@
 # WageLens
 
+**Live research preview:** [Open WageLens](https://wagelensuk.wluk.workers.dev/#/).
+
 [![Verification](https://github.com/shaswatshukla/wagelens/actions/workflows/ci.yml/badge.svg)](https://github.com/shaswatshukla/wagelens/actions/workflows/ci.yml)
 
 ![WageLens dark interface](docs/images/wagelens.webp)
