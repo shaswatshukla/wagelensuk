@@ -1,5 +1,13 @@
 # Deployment and maintenance
 
+## Current hosted preview
+
+- Live app: https://wagelensuk.wluk.workers.dev/#/
+- Health-check base URL (`SITE_URL`): `https://wagelensuk.wluk.workers.dev/`.
+- Deployed repository: `shaswatshukla/wagelensuk`; Cloudflare Worker: `wagelensuk`.
+
+The current preview uses Cloudflare Workers static assets. The Pages instructions below describe the alternative Pages setup.
+
 ## Primary: Cloudflare Pages
 
 The project is a static Vite build. Connect the private `shaswatshukla/wagelens` repository to Pages and use:
