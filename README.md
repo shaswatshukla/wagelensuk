@@ -2,7 +2,7 @@
 
 **Live research preview:** [Open WageLens](https://wagelensuk.wluk.workers.dev/#/).
 
-[![Verification](https://github.com/shaswatshukla/wagelens/actions/workflows/ci.yml/badge.svg)](https://github.com/shaswatshukla/wagelens/actions/workflows/ci.yml)
+[![Verification](https://github.com/shaswatshukla/wagelensuk/actions/workflows/ci.yml/badge.svg)](https://github.com/shaswatshukla/wagelensuk/actions/workflows/ci.yml)
 
 ![WageLens dark interface](docs/images/wagelens.webp)
 
@@ -11,7 +11,7 @@ A privacy-first TypeScript portfolio project: local document recognition, conser
 **Recruiter walkthrough:** [engineering decisions and a two-minute demo](docs/portfolio.md).
 
 
-A private, static Skilled Worker payroll screening website. Bold dark theme, browser-only Excel/CSV/TSV and pasted-cell imports, column mapping, hourly arithmetic, per-period findings, CSV export and print-to-PDF.
+A static Skilled Worker payroll screening website. Bold dark theme, browser-only Excel/CSV/TSV and pasted-cell imports, column mapping, hourly arithmetic, per-period findings, CSV export and print-to-PDF.
 
 Excel workbooks support `.xlsx` and `.xls`, with explicit selection when multiple visible sheets exist. Formula cells require a values-only sheet to avoid trusting stale cached results. Text inputs accept CSV or tab-separated cells from Excel/Google Sheets. Maximum file size is 5 MB and maximum table size is 10,000 payroll rows. SheetJS is bundled locally from its official 0.20.3 distribution; there are no runtime CDN requests.
 
@@ -49,5 +49,7 @@ Serve the production build, clear the Network panel, then import, confirm, scree
 
 ## Hosting and maintenance
 
-See [deployment and recovery](docs/deployment.md) for Cloudflare Pages, automated checks and the optional Oracle standby. The repository stays private. A hosted portfolio demonstration is authorised; a production compliance-service launch still requires solicitor review and completion of the outstanding work. No payroll backend is deployed.
+See [deployment and recovery](docs/deployment.md) for Cloudflare Workers static hosting, automated checks and the optional Oracle standby. The original source repository remains private; the deployed `wagelensuk` showcase repository is public. A hosted portfolio demonstration is authorised; a production compliance-service launch still requires solicitor review and completion of the outstanding work. No payroll backend is deployed.
 
+
+See [30 October review fixes and verification](docs/review-fixes.md) for theme, accessibility, calculation evidence, mobile cards, direct document URLs, file safeguards and performance measurements.

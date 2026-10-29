@@ -7,6 +7,7 @@ import {
   readWorkbook as readWorkbookWithTools,
   readPayrollFile,
   maxBytes,
+  checkExpandedWorkbook,
 } from "./imports";
 import { columns, parsePayroll } from "./engine/index";
 const readWorkbook = (buffer: ArrayBuffer) =>
@@ -109,4 +110,16 @@ describe("additional local input formats", () => {
       "SW-XLS",
     );
   });
+});
+it("rejects workbooks with excessive declared ZIP expansion before parsing", () => {
+  const bytes = new ArrayBuffer(80),
+    view = new DataView(bytes);
+  view.setUint32(0, 0x04034b50, true);
+  view.setUint32(4, 0x02014b50, true);
+  view.setUint32(28, 51 * 1024 * 1024, true);
+  view.setUint32(58, 0x06054b50, true);
+  view.setUint16(68, 1, true);
+  view.setUint32(74, 4, true);
+  expect(() => checkExpandedWorkbook(bytes)).toThrow(/Expanded workbook/);
+  expect(() => matrixToCSV([Array(102).fill("x")])).toThrow(/101 columns/);
 });

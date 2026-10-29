@@ -332,14 +332,14 @@ nav a.active {
 }
 .hero {
   position: relative;
-  padding: 66px 0 40px;
+  padding: 32px 0 24px;
   display: grid;
   grid-template-columns: 1.4fr 1fr;
   align-items: end;
   gap: 70px;
 }
 .eyebrow {
-  color: #b9b0ff;
+  color: var(--accent);
   font-size: 10px;
   letter-spacing: 1.7px;
   font-weight: 700;
@@ -433,7 +433,7 @@ h1 em {
   height: 29px;
   border-radius: 7px;
   background: #8170ff16;
-  color: #b6aaff;
+  color: var(--accent);
   font-size: 16px;
 }
 .tag {
@@ -472,11 +472,11 @@ h1 em {
   place-items: center;
 }
 .steps .current {
-  color: #c7bfff;
+  color: var(--accent);
 }
 .steps .current b {
   background: var(--accent);
-  color: #fff;
+  color: var(--bg);
   border-color: var(--accent);
 }
 .workspace-body {
@@ -512,7 +512,7 @@ h1 em {
   border: 1px solid var(--line);
   display: grid;
   place-items: center;
-  color: #b6aaff;
+  color: var(--accent);
   margin-bottom: 17px;
 }
 .upload-icon svg {
@@ -561,7 +561,7 @@ h1 em {
   background: none;
   border: 0;
   padding: 0;
-  color: #beb3ff;
+  color: var(--accent);
   font-size: 11px;
 }
 .sidebar {
@@ -581,7 +581,7 @@ h1 em {
 }
 .side-item .side-icon {
   font-size: 15px;
-  color: #b8aeff;
+  color: var(--accent);
   flex-shrink: 0;
   width: 20px;
 }
@@ -803,7 +803,7 @@ td:first-child {
   position: relative;
 }
 .how-card .number {
-  color: #807989;
+  color: var(--muted);
   font-size: 10px;
   font-family: monospace;
   display: block;
@@ -825,7 +825,7 @@ td:first-child {
   position: absolute;
   right: 5px;
   top: 0;
-  color: #68636f;
+  color: var(--muted);
 }
 footer {
   border-top: 1px solid var(--line);
@@ -900,7 +900,7 @@ select {
   border-radius: 5px;
 }
 .error {
-  color: #ff9caa;
+  color: var(--red);
   margin: 12px 0;
   font-size: 12px;
   line-height: 1.6;
@@ -925,7 +925,7 @@ select {
   color: var(--muted);
 }
 .document a {
-  color: #b6aaff;
+  color: var(--accent);
   text-decoration: underline;
 }
 .document ul {
@@ -998,6 +998,12 @@ svg {
     font-size: 11px;
   }
   .header-end {
+    display: flex;
+  }
+  .header-end .private {
+    display: none;
+  }
+  nav a:first-child {
     display: none;
   }
   nav a:last-child {
@@ -1211,7 +1217,7 @@ svg {
 }
 .worker-group {
   margin: 18px 0;
-  border: 1px solid var(--border, #303136);
+  border: 1px solid var(--line);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -1222,11 +1228,11 @@ svg {
   gap: 14px 28px;
   padding: 20px 24px;
   cursor: pointer;
-  background: #1d1d24;
+  background: var(--raised);
   font-size: 13px;
 }
 .worker-group > summary:focus-visible {
-  outline: 2px solid #b9a1ff;
+  outline: 2px solid var(--accent);
   outline-offset: -3px;
 }
 .worker-group .table-shell {
@@ -1236,14 +1242,14 @@ svg {
 }
 .worker-toggle {
   margin-left: auto;
-  color: #cbb8ff;
+  color: var(--accent);
 }
 .review-reason {
   display: block;
   max-width: 240px;
   margin-top: 8px;
   line-height: 1.5;
-  color: #c4c4cf;
+  color: var(--muted);
 }
 .worker-group .detail-btn {
   width: auto;
@@ -1261,5 +1267,196 @@ svg {
   }
   .worker-toggle {
     margin-left: 0;
+  }
+}
+/* Audit fixes: shared theme tokens and accessible interaction sizes. */
+.skip-link {
+  position: fixed;
+  left: 16px;
+  top: -100px;
+  z-index: 100;
+  padding: 14px 20px;
+  background: var(--panel);
+  color: var(--text);
+  border: 2px solid var(--accent);
+}
+.skip-link:focus {
+  top: 12px;
+}
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.hero h1 {
+  font-size: clamp(38px, 4.1vw, 62px);
+  letter-spacing: -2.5px;
+  max-width: 760px;
+}
+.hero-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 22px;
+}
+.workspace-title h2 {
+  font-size: 14px;
+  margin: 0;
+  letter-spacing: 0;
+}
+.dropzone h3 {
+  font-size: 20px;
+  margin: 12px 0;
+}
+.text-btn {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+button,
+.report-menu > summary {
+  min-height: 44px;
+}
+textarea:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.report-actions {
+  align-items: start;
+}
+.report-menu {
+  position: relative;
+}
+.report-menu > summary {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+.report-menu > div {
+  position: absolute;
+  right: 0;
+  z-index: 5;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  padding: 10px;
+  border-radius: 8px;
+  width: 220px;
+  box-shadow: 0 10px 30px #0003;
+  display: grid;
+  gap: 8px;
+}
+.results-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.calculation-evidence {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+  margin: 16px 0;
+}
+.calculation-evidence h4 {
+  margin: 0 0 12px;
+}
+.mobile-findings {
+  display: none;
+}
+.detailed-table > summary {
+  display: none;
+}
+.print-report {
+  display: none;
+}
+@media (max-width: 650px) {
+  .mobile-findings {
+    display: block;
+  }
+  .finding-card {
+    padding: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+  .finding-card h3 {
+    font-size: 14px;
+    margin-top: 0;
+  }
+  .finding-card dl {
+    display: grid;
+    grid-template-columns: minmax(100px, 1fr) minmax(0, 1.3fr);
+    gap: 12px;
+  }
+  .finding-card dt {
+    color: var(--muted);
+  }
+  .finding-card dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+  .finding-card p {
+    overflow-wrap: anywhere;
+  }
+  .finding-card ol {
+    padding-left: 20px;
+  }
+  .detailed-table > summary {
+    display: block;
+    padding: 16px;
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .detailed-table:not([open]) > .table-shell {
+    display: none;
+  }
+  .report-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .hero-actions > button {
+    flex: 1;
+    min-width: 160px;
+  }
+}
+@media print {
+  body:has(.print-report) > #app {
+    display: none;
+  }
+  .print-report {
+    display: block;
+  }
+  .print-report .worker-group > summary {
+    background: white;
+    color: black;
+  }
+  .print-report .mobile-findings,
+  .print-report .results-pagination,
+  .print-report .detail-btn,
+  .print-report .detailed-table > summary {
+    display: none;
+  }
+  .print-report .review-reason {
+    color: black;
+  }
+  .print-report table {
+    min-width: 0;
+    font-size: 9px;
+  }
+  .print-report td,
+  .print-report th {
+    white-space: normal;
+    padding: 6px;
   }
 }

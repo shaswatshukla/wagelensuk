@@ -16,6 +16,8 @@ const quote = (value: string) => '"' + value.replaceAll('"', '""') + '"';
 export function matrixToCSV(rows: unknown[][]): string {
   if (rows.length > 10001)
     throw Error("Import up to 10,000 payroll rows at a time.");
+  if (rows.some((row) => row.length > 101))
+    throw Error("Import at most 101 columns. Remove unrelated columns first.");
   return rows
     .map((row) =>
       row
@@ -64,6 +66,7 @@ export function readWorkbook(
   buffer: ArrayBuffer,
   tools: WorkbookTools,
 ): PayrollImport {
+  checkExpandedWorkbook(buffer);
   let workbook: WorkBook;
   try {
     workbook = tools.read(buffer, {
@@ -89,6 +92,47 @@ export function readWorkbook(
       return sheetToCSV(workbook.Sheets[name], tools);
     },
   };
+}
+/** Bound declared ZIP expansion before passing an XLSX archive to the parser. */
+export function checkExpandedWorkbook(buffer: ArrayBuffer): void {
+  const view = new DataView(buffer);
+  if (view.byteLength < 4 || view.getUint32(0, true) !== 0x04034b50) return;
+  let end = -1;
+  for (
+    let i = view.byteLength - 22;
+    i >= Math.max(0, view.byteLength - 65557);
+    i--
+  ) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      end = i;
+      break;
+    }
+  }
+  if (end < 0) throw Error("Invalid workbook ZIP directory.");
+  const count = view.getUint16(end + 10, true);
+  let offset = view.getUint32(end + 16, true),
+    expanded = 0;
+  if (count > 1000)
+    throw Error(
+      "Workbook has too many archive entries. Export a payroll-only sheet.",
+    );
+  for (let i = 0; i < count; i++) {
+    if (
+      offset + 46 > view.byteLength ||
+      view.getUint32(offset, true) !== 0x02014b50
+    )
+      throw Error("Invalid workbook ZIP directory.");
+    expanded += view.getUint32(offset + 24, true);
+    if (expanded > 50 * 1024 * 1024)
+      throw Error(
+        "Expanded workbook exceeds 50 MB. Export a smaller payroll-only workbook.",
+      );
+    offset +=
+      46 +
+      view.getUint16(offset + 28, true) +
+      view.getUint16(offset + 30, true) +
+      view.getUint16(offset + 32, true);
+  }
 }
 export async function readPayrollFile(file: File): Promise<PayrollImport> {
   if (file.size > maxBytes)

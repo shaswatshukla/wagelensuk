@@ -1,3 +1,6 @@
+import { docs, pageMeta, siteURL } from "./pages";
+import { workerMarkup } from "./results-view";
+import { csvSafe } from "./exports";
 import "./style.css";
 import {
   calculationParameters,
@@ -25,6 +28,8 @@ import {
 } from "./engine/index";
 const app = document.querySelector<HTMLDivElement>("#app")!;
 let results: Result[] = [];
+let workerPage = 0;
+const periodPages = new Map<string, number>();
 let confirmedPayroll: Row[] = [];
 let sample = false;
 let raw = "";
@@ -92,10 +97,11 @@ const sampleCSV =
     .map((r) => r.join(","))
     .join("\n");
 function brand() {
-  return '<a class="brand" href="#/" aria-label="WageLens home"><span class="logo" aria-hidden="true">W</span>WageLens<span class="dot"></span></a>';
+  return '<a class="brand" href="/" aria-label="WageLens home"><span class="logo" aria-hidden="true">W</span>WageLens<span class="dot"></span></a>';
 }
 function shell(content: string) {
-  app.innerHTML = `<header>${brand()}<nav aria-label="Main navigation"><a href="#/" class="${route() === "/" ? "active" : ""}">Salary checker</a><a href="#/how-it-works">How it works</a><a href="#/rules">Rules & sources ↗</a></nav><div class="header-end"><span class="private"><span class="dot"></span> Private by design</span><button class="icon-btn" id="theme" aria-label="Toggle colour theme">${icon("sun")}</button></div></header><main class="wrap">${content}</main><footer>${brand()}<p>Built for clarity. Designed for privacy.<br>Decision support, not legal advice. Always review findings with your adviser.</p><div class="links"><a href="#/privacy">Privacy</a><a href="#/disclaimer">Disclaimer</a><a href="#/rules">Sources ↗</a></div></footer>`;
+  updateMetadata();
+  app.innerHTML = `<a class="skip-link" href="#main-content">Skip to main content</a><div id="screening-status" class="sr-only" role="status" aria-live="polite"></div><header>${brand()}<nav aria-label="Main navigation"><a href="/" class="${route() === "/" ? "active" : ""}">Salary checker</a><a href="/how-it-works">How it works</a><a href="/rules">Rules & sources ↗</a></nav><div class="header-end"><span class="private"><span class="dot"></span> Private by design</span><button class="icon-btn" id="theme" aria-label="Toggle colour theme">${icon("sun")}</button></div></header><main class="wrap" id="main-content" tabindex="-1">${content}</main><footer>${brand()}<p>Built for clarity. Designed for privacy.<br>Decision support, not legal advice. Always review findings with your adviser.</p><div class="links"><a href="/privacy">Privacy</a><a href="/disclaimer">Disclaimer</a><a href="/rules">Sources ↗</a></div></footer>`;
   document
     .querySelector("#theme")
     ?.addEventListener("click", () =>
@@ -103,7 +109,12 @@ function shell(content: string) {
     );
 }
 function route() {
-  return location.hash.slice(1) || "/";
+  return (
+    (location.hash.startsWith("#/")
+      ? location.hash.slice(1)
+      : location.pathname
+    ).replace(/\/$/, "") || "/"
+  );
 }
 function how() {
   return `<section class="how" id="how"><div class="how-heading"><h2>Less admin. More clarity.</h2><p>Three steps. Your data stays with you.</p></div><div class="how-grid"><article class="how-card"><span class="number">01 / IMPORT</span><h3>Your payroll. Your format.</h3><p>Import your Excel, CSV, TSV or digital PDF, or paste spreadsheet cells. We suggest the useful fields. Confirm the matches and fill any missing details.</p></article><article class="how-card"><span class="number">02 / SCREEN</span><h3>See the numbers behind the pay.</h3><p>Screen basic pay against your supplied hourly rate. Missing evidence is flagged for review.</p></article><article class="how-card"><span class="number">03 / TAKE ACTION</span><h3>A clear next step for every finding.</h3><p>Explore each worker’s findings and export a report to review with your payroll team or adviser.</p></article></div></section>`;
@@ -114,12 +125,22 @@ function render() {
     return;
   }
   shell(
-    `<section class="hero"><div><div class="eyebrow"><span></span> SKILLED WORKER SALARY SCREENING</div><h1>Every pay period.<br><em>A clearer picture.</em></h1><p>Spot potential salary shortfalls in your sponsored workforce. Your payroll stays in your browser.</p></div><aside class="hero-aside"><div class="tiny">${icon("shield", 15)} Your data is your business.</div><p>No accounts. No uploads. No tracking.<br>Just a clearer view of the numbers,<br>with the rules behind every finding.</p></aside></section><div class="feature-strip"><span><b>✓</b> Free to use</span><span><b>✓</b> No sign-up needed</span><span><b>✓</b> Browser-only processing</span><span><b>↗</b> Based on published Home Office rules</span></div><section class="workspace" aria-labelledby="checker-title"><div class="workspace-top"><div class="workspace-title"><span class="square-icon">${icon("file")}</span><span id="checker-title">Check your payroll</span><span class="tag">RESEARCH PREVIEW</span></div><div class="steps"><span class="current"><b>1</b> Import payroll</span><i></i><span><b>2</b> Confirm fields</span><i></i><span><b>3</b> Review findings</span></div></div><div id="import-content"><div class="workspace-body"><div class="upload-area"><div class="import-tabs" role="tablist" aria-label="Payroll input method"><button id="upload-tab" role="tab" aria-selected="true" aria-controls="upload-panel" tabindex="0">${icon("file", 14)} Upload a file</button><button id="paste-tab" role="tab" aria-selected="false" aria-controls="paste-panel" tabindex="-1">${icon("file", 14)} Paste spreadsheet</button></div><div id="upload-panel" role="tabpanel" aria-labelledby="upload-tab"><div class="dropzone" id="dropzone"><div class="upload-icon">${icon("upload", 24)}</div><h2>Drop your payroll file here</h2><p>Your existing payroll export. We find the fields.</p><button class="primary" id="browse">${icon("upload", 14)} Choose payroll file</button><input type="file" id="file" accept="${acceptedFiles}" hidden><p class="file-note"><span class="format-pill">.xlsx / .xls</span> <span class="format-pill">.csv</span> <span class="format-pill">.tsv</span> <span class="format-pill">.pdf</span><br>Up to 5 MB · Digital PDFs supported · No scans yet</p></div><div class="under-drop"><span>Just exploring? <button class="text-btn" id="sample">Try sample data ${icon("arrow", 12)}</button></span><button class="text-btn" id="template">${icon("download", 12)} Download CSV template</button></div></div><div id="paste-panel" role="tabpanel" aria-labelledby="paste-tab" hidden><label for="paste-data" class="paste-label">Paste your payroll cells</label><p class="paste-help" id="paste-help">Copy from Excel or Google Sheets, including the header row. We suggest matching columns and exclude obvious identifiers.</p><textarea id="paste-data" aria-describedby="paste-help" placeholder="worker_ref&#9;pay_period_start&#9;basic_pay_gbp&#10;SW-001&#9;2026-07-01&#9;4400" spellcheck="false" maxlength="5242880"></textarea><button class="primary" id="use-paste">Find payroll fields ${icon("arrow", 14)}</button></div><div id="error" role="alert" class="error"></div></div><aside class="sidebar"><h3>A little preparation goes a long way.</h3><div class="side-item"><span class="side-icon">${icon("file")}</span><div><strong>Use worker references</strong><p>Obvious identifying columns are excluded automatically. Confirm that selected fields contain no names or NI numbers.</p></div></div><div class="side-item"><span class="side-icon">${icon("check")}</span><div><strong>Have your CoS details ready</strong><p>You supply the required annual salary and applicable hourly going rate.</p></div></div><div class="side-item"><span class="side-icon">${icon("info")}</span><div><strong>Clear findings, no false certainty</strong><p>Unconfirmed rules or missing context always mean review.</p></div></div></aside></div></div><div class="privacy-line">${icon("lock", 12)} Processed in your browser. Nothing uploaded.<a class="text-btn" href="#/verify">Verify this ↗</a></div></section><div id="results"></div>${how()}`,
+    `<section class="hero"><div><div class="eyebrow"><span></span> SKILLED WORKER SALARY SCREENING</div><h1>Spot potential Skilled Worker <em>salary shortfalls.</em></h1><p>Compare payroll with your supplied salary requirements and export findings for review. Your payroll stays in your browser.</p><div class="hero-actions"><button class="primary" id="hero-sample">Try sample screening</button><button class="secondary" id="hero-browse">Choose payroll file</button></div></div><aside class="hero-aside"><div class="tiny">${icon("shield", 15)} Your data is your business.</div><p>No accounts. No uploads. No tracking.<br>Just a clearer view of the numbers,<br>with the rules behind every finding.</p></aside></section><div class="feature-strip"><span><b>✓</b> Free to use</span><span><b>✓</b> No sign-up needed</span><span><b>✓</b> Browser-only processing</span><span><b>↗</b> Based on published Home Office rules</span></div><section class="workspace" aria-labelledby="checker-title"><div class="workspace-top"><div class="workspace-title"><span class="square-icon">${icon("file")}</span><h2 id="checker-title">Check your payroll</h2><span class="tag">RESEARCH PREVIEW</span></div><div class="steps"><span class="current"><b>1</b> Import payroll</span><i></i><span><b>2</b> Confirm fields</span><i></i><span><b>3</b> Review findings</span></div></div><div id="import-content"><div class="workspace-body"><div class="upload-area"><div class="import-tabs" role="tablist" aria-label="Payroll input method"><button id="upload-tab" role="tab" aria-selected="true" aria-controls="upload-panel" tabindex="0">${icon("file", 14)} Upload a file</button><button id="paste-tab" role="tab" aria-selected="false" aria-controls="paste-panel" tabindex="-1">${icon("file", 14)} Paste spreadsheet</button></div><div id="upload-panel" role="tabpanel" aria-labelledby="upload-tab"><div class="dropzone" id="dropzone"><div class="upload-icon">${icon("upload", 24)}</div><h3>Drop your payroll file here</h3><p>Your existing payroll export. We find the fields.</p><button class="primary" id="browse">${icon("upload", 14)} Choose payroll file</button><input type="file" id="file" accept="${acceptedFiles}" hidden><p class="file-note"><span class="format-pill">.xlsx / .xls</span> <span class="format-pill">.csv</span> <span class="format-pill">.tsv</span> <span class="format-pill">.pdf</span><br>Up to 5 MB · Digital PDFs supported · No scans yet</p></div><div class="under-drop"><span>Just exploring? <button class="text-btn" id="sample">Try sample data ${icon("arrow", 12)}</button></span><button class="text-btn" id="template">${icon("download", 12)} Download CSV template</button></div></div><div id="paste-panel" role="tabpanel" aria-labelledby="paste-tab" hidden><label for="paste-data" class="paste-label">Paste your payroll cells</label><p class="paste-help" id="paste-help">Copy from Excel or Google Sheets, including the header row. We suggest matching columns and exclude obvious identifiers.</p><textarea id="paste-data" aria-describedby="paste-help" placeholder="worker_ref&#9;pay_period_start&#9;basic_pay_gbp&#10;SW-001&#9;2026-07-01&#9;4400" spellcheck="false" maxlength="5242880"></textarea><button class="primary" id="use-paste">Find payroll fields ${icon("arrow", 14)}</button></div><div id="error" role="alert" class="error"></div></div><aside class="sidebar"><h3>A little preparation goes a long way.</h3><div class="side-item"><span class="side-icon">${icon("file")}</span><div><strong>Use worker references</strong><p>Obvious identifying columns are excluded automatically. Confirm that selected fields contain no names or NI numbers.</p></div></div><div class="side-item"><span class="side-icon">${icon("check")}</span><div><strong>Have your CoS details ready</strong><p>You supply each worker’s applicable annual requirement and hourly going rate. Check their CoS, occupation and current Home Office guidance with your adviser. WageLens does not select these thresholds. <a href="/rules#inputs">Required inputs →</a></p></div></div><div class="side-item"><span class="side-icon">${icon("info")}</span><div><strong>Clear findings, no false certainty</strong><p>Unconfirmed rules or missing context always mean review.</p></div></div></aside></div></div><div class="privacy-line">${icon("lock", 12)} Processed in your browser. Nothing uploaded.<a class="text-btn" href="/verify">Verify this ↗</a></div></section><div id="results"></div>${how()}`,
   );
   bindImport();
   renderResults();
 }
 function bindImport() {
+  document
+    .querySelector("#hero-sample")
+    ?.addEventListener("click", () =>
+      document.querySelector<HTMLButtonElement>("#sample")!.click(),
+    );
+  document
+    .querySelector("#hero-browse")
+    ?.addEventListener("click", () =>
+      document.querySelector<HTMLInputElement>("#file")!.click(),
+    );
   const tabs = [
     document.querySelector<HTMLButtonElement>("#upload-tab")!,
     document.querySelector<HTMLButtonElement>("#paste-tab")!,
@@ -183,6 +204,8 @@ function bindImport() {
     sample = true;
     fileName = "wagelens-sample.csv";
     confirmedPayroll = parsePayroll(sampleCSV);
+    workerPage = 0;
+    periodPages.clear();
     results = evaluate(confirmedPayroll);
     renderResults();
     document
@@ -202,6 +225,8 @@ function stageImport(csv: string, name: string) {
     name,
     (confirmed) => {
       confirmedPayroll = confirmed;
+      workerPage = 0;
+      periodPages.clear();
       results = evaluate(confirmedPayroll);
       fileName = name;
       pendingFileName = "";
@@ -209,6 +234,7 @@ function stageImport(csv: string, name: string) {
       raw = "";
       headers = [];
       render();
+      document.querySelector<HTMLElement>("#results-title")?.focus();
       document
         .querySelector("#results")
         ?.scrollIntoView({ behavior: "smooth" });
@@ -258,29 +284,14 @@ function renderSheetPicker(imported: PayrollImport, name: string) {
     render();
   });
 }
-function windowLabel(r: Result): string {
-  const finding = r.windowFinding;
-  if (!finding || finding.status === "REVIEW")
-    return "More evidence / review needed";
-  if (finding.status === "FAIL")
-    return finding.shortfallAmount
-      ? money(finding.shortfallAmount) + " potential gap"
-      : "Potential salary gap";
-  return "No shortfall in aligned window";
-}
-function reviewReason(r: Result): string {
-  if (r.shortfallAmount && r.windowFinding?.status === "FAIL")
-    return "Hourly and salary-window gaps";
-  if (r.shortfallAmount) return "Potential hourly pay gap";
-  if (r.windowFinding?.status === "FAIL") return "Potential salary-window gap";
-  if (!r.windowFinding) return r.explanation;
-  if (r.windowFinding.status === "REVIEW")
-    return "Window evidence or scope needs review";
-  return "Full boundaries and exceptions need review";
-}
 function renderResults() {
   const el = document.querySelector("#results");
   if (!el) return;
+  const expandedWorkers = new Set(
+    Array.from(
+      el.querySelectorAll<HTMLDetailsElement>(".worker-group[open]"),
+    ).map((d) => d.dataset.worker),
+  );
   if (!results.length) {
     el.innerHTML = "";
     return;
@@ -295,42 +306,65 @@ function renderResults() {
   });
   const workers = groups.size;
   const issues = results.filter((r) => r.shortfallAmount).length;
-  el.innerHTML = `<section class="results-section" aria-labelledby="results-title"><div class="section-head"><div><h2 id="results-title">Your payroll, in focus. <span class="tag">${sample ? "SAMPLE DATA" : "LOCAL FILE"}</span></h2><p>${esc(fileName)} · Pay-period screening preview</p></div><div class="report-actions"><button class="secondary" id="recheck">↻ Recheck data</button><button class="secondary" id="export-json">Export JSON</button><button class="secondary" id="export">${icon("download", 12)} Export CSV</button><button class="secondary" id="print">${icon("file", 12)} Print / save PDF</button><button class="secondary" id="clear">Clear data</button></div></div><div class="summary"><div class="stat"><div class="stat-top">Workers screened ${icon("file", 12)}</div><strong>${workers.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Pay periods ${icon("check", 12)}</div><strong>${results.length.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Potential hourly shortfalls ${icon("info", 12)}</div><strong class="red">${issues.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Need full review ${icon("info", 12)}</div><strong class="amber">${results
+  el.innerHTML = `<section class="results-section" aria-labelledby="results-title"><div class="section-head"><div><h2 id="results-title" tabindex="-1">Your payroll, in focus. <span class="tag">${sample ? "SAMPLE DATA" : "LOCAL FILE"}</span></h2><p>${esc(fileName)} · Based on user-supplied thresholds · Research preview</p></div><div class="report-actions"><button class="primary" id="export">${icon("download", 12)} Export CSV</button><details class="report-menu"><summary class="secondary">More actions</summary><div><button class="secondary" id="export-json">Export JSON</button><button class="secondary" id="print">Print / save PDF</button><button class="secondary" id="recheck"><span aria-hidden="true">↻</span> Recheck data</button><button class="secondary" id="clear">Clear data</button></div></details></div></div><div class="summary"><div class="stat"><div class="stat-top">Workers screened ${icon("file", 12)}</div><strong>${workers.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Pay periods ${icon("check", 12)}</div><strong>${results.length.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Potential hourly shortfalls ${icon("info", 12)}</div><strong class="red">${issues.toString().padStart(2, "0")}</strong></div><div class="stat"><div class="stat-top">Need full review ${icon("info", 12)}</div><strong class="amber">${results
     .filter((r) => r.status === "REVIEW")
     .length.toString()
     .padStart(2, "0")}</strong></div></div>${[...groups]
-    .map(([worker, workerResults]) => {
-      const hourlyGaps = workerResults.filter((r) => r.shortfallAmount).length;
-      const latest = workerResults[workerResults.length - 1];
-      const windowGaps = workerResults.filter(
-        (r) => r.windowFinding?.status === "FAIL",
-      ).length;
-      return `<details class="worker-group" open><summary><strong class="worker-name">${esc(worker)}</strong><span>${workerResults.length} pay periods</span><span class="${hourlyGaps ? "red" : ""}">Hourly: ${hourlyGaps ? `${hourlyGaps} potential gaps` : workerResults.every((r) => r.windowFinding) ? "No shortfall detected" : "Review required"}</span><span class="${windowGaps ? "red" : ""}">Salary window: ${windowGaps ? `${windowGaps} potential gaps` : esc(windowLabel(latest))}</span><span class="worker-toggle">Pay periods ⌄</span></summary><div class="table-shell" tabindex="0" role="region" aria-label="Scrollable pay-period findings"><table><caption class="file-note">Pay-period checks — hourly and salary-window findings are separate</caption><thead><tr><th scope="col">Worker reference</th><th scope="col">Pay period</th><th scope="col">Basic pay</th><th scope="col">Hourly screen</th><th scope="col">Salary-window check</th><th scope="col">Review reason</th><th scope="col">Details</th></tr></thead><tbody>${workerResults
-        .map(
-          (r) =>
-            `<tr><td><div class="worker-ref"><span class="avatar">${String(resultIndices.get(r)! + 1).padStart(2, "0")}</span>${esc(r.worker)}</div></td><td>${esc(r.period)}</td><td>${money(r.pay)}</td><td class="${r.shortfallAmount ? "red" : ""}">${r.shortfallAmount ? money(r.shortfallAmount) + " potential gap" : r.windowFinding ? "No shortfall detected*" : "Not screened"}</td><td class="${r.windowFinding?.status === "FAIL" ? "red" : ""}">${esc(windowLabel(r))}</td><td><span class="status">${icon("info", 11)} Review</span><small class="review-reason">${esc(reviewReason(r))}</small></td><td><button class="detail-btn" data-detail="${resultIndices.get(r)!}" aria-expanded="false" aria-controls="detail-${resultIndices.get(r)!}" aria-label="Show findings for ${esc(r.worker)}">View calculation ⌄</button></td></tr><tr class="detail-row" id="detail-${resultIndices.get(r)!}" hidden><td colspan="7"><strong>${esc(findingGuidance(r).heading)} · ${esc(findingGuidance(r).references.join("; "))}</strong><br>${esc(r.explanation)}${r.windowFinding ? `<br><strong>Aligned window: ${r.windowFinding.status}</strong> · ${esc(r.windowFinding.explanation)}` : ""}<br><strong>Suggested mitigation / next steps:</strong><ol>${findingGuidance(
-              r,
-            )
-              .actions.map((action) => `<li>${esc(action)}</li>`)
-              .join(
-                "",
-              )}</ol><a href="${officialLinks.skilledWorker}" target="_blank" rel="noreferrer">Immigration rule source ↗</a> · <a href="${officialLinks.reporting}" target="_blank" rel="noreferrer">Sponsor reporting duties ↗</a>${r.shortfallAmount ? "<br>Consider whether a reportable salary reduction has occurred; the reporting clock is not calculated in this preview." : ""}<br>Rule version ${rules.version} · Last verified ${rules.lastVerified} · Decision support, not legal advice.</td></tr>`,
-        )
-        .join("")}</tbody></table></div></details>`;
-    })
+    .slice(workerPage * 10, (workerPage + 1) * 10)
+    .map(([worker, rows]) =>
+      workerMarkup(
+        worker,
+        rows,
+        resultIndices,
+        workers,
+        periodPages.get(worker) || 0,
+      ),
+    )
     .join(
       "",
-    )}<details class="match-details calculation-method"><summary>How these findings are calculated</summary><p>Predefined rules, not AI: confirmed basic pay is compared with actual hours × your supplied hourly going rate. Complete aligned monthly windows compare with annual requirement × ${calculationParameters.monthlyMonths}/${calculationParameters.monthsInYear}; more frequent pay uses ${calculationParameters.frequentWeeks}/${calculationParameters.weeksInYear}. Integer-pence and rational arithmetic avoid floating-point money comparisons. Missing evidence and unresolved exceptions remain REVIEW.</p><p>Recheck data repeats the calculation using the ruleset shown below. It does not fetch new Home Office rules or retrieve amended payroll. Import a new export when payroll changes; rule updates require a reviewed release.</p><a href="#/rules">Rules, version and limitations →</a> · <a href="${officialLinks.hmrc}" target="_blank" rel="noreferrer">HMRC payroll reporting guidance ↗</a><p>HMRC guidance concerns payroll reporting. Skilled Worker salary requirements come from the Home Office Immigration Rules.</p></details><div id="recheck-status" class="paste-help" role="status"></div><div class="result-note">${icon("info", 13)}<span>*This preview screens basic pay against the supplied hourly rate. Aligned salary-window checks are shown separately; arbitrary boundaries and exceptions require further review. Every overall finding remains REVIEW. Decision support, not legal advice.</span></div><div class="version-line"><span>RULESET ${rules.version} · LAST VERIFIED ${rules.lastVerified} · SOLICITOR REVIEW PENDING</span><a href="#/rules">See how the rules are interpreted ↗</a><span>Generated ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })} UK time</span></div></section>`;
+    )}${workers > 10 ? `<div class="results-pagination"><button class="secondary" id="previous-workers" ${workerPage === 0 ? "disabled" : ""}>Previous workers</button><span>Workers ${workerPage * 10 + 1}–${Math.min(workers, (workerPage + 1) * 10)} of ${workers}. Exports include all records.</span><button class="secondary" id="next-workers" ${(workerPage + 1) * 10 >= workers ? "disabled" : ""}>Next workers</button></div>` : ""}<details class="match-details calculation-method"><summary>How these findings are calculated</summary><p>Predefined rules, not AI: confirmed basic pay is compared with actual hours × your supplied hourly going rate. Complete aligned monthly windows compare with annual requirement × ${calculationParameters.monthlyMonths}/${calculationParameters.monthsInYear}; more frequent pay uses ${calculationParameters.frequentWeeks}/${calculationParameters.weeksInYear}. Integer-pence and rational arithmetic avoid floating-point money comparisons. Missing evidence and unresolved exceptions remain REVIEW.</p><p>Recheck data repeats the calculation using the ruleset shown below. It does not fetch new Home Office rules or retrieve amended payroll. Import a new export when payroll changes; rule updates require a reviewed release.</p><a href="/rules">Rules, version and limitations →</a> · <a href="${officialLinks.hmrc}" target="_blank" rel="noreferrer">HMRC payroll reporting guidance ↗</a><p>HMRC guidance concerns payroll reporting. Skilled Worker salary requirements come from the Home Office Immigration Rules.</p></details><div id="recheck-status" class="paste-help" role="status"></div><div class="result-note">${icon("info", 13)}<span>*This preview screens basic pay against the supplied hourly rate. Aligned salary-window checks are shown separately; arbitrary boundaries and exceptions require further review. Every overall finding remains REVIEW. Decision support, not legal advice.</span></div><div class="version-line"><span>RULESET ${rules.version} · LAST VERIFIED ${rules.lastVerified} · SOLICITOR REVIEW PENDING</span><a href="/rules">See how the rules are interpreted ↗</a><span>Generated ${new Date().toLocaleString("en-GB", { timeZone: "Europe/London" })} UK time</span></div></section>`;
+  el.querySelectorAll<HTMLDetailsElement>(".worker-group").forEach((d) => {
+    if (expandedWorkers.has(d.dataset.worker)) d.open = true;
+  });
+  el.querySelectorAll<HTMLDetailsElement>(".detailed-table").forEach(
+    (d) => (d.open = !matchMedia("(max-width: 650px)").matches),
+  );
   el.querySelectorAll<HTMLButtonElement>("[data-detail]").forEach((b) =>
     b.addEventListener("click", () => {
       const row = document.querySelector<HTMLTableRowElement>(
-        `#detail-${b.dataset.detail}`,
+        `#${b.getAttribute("aria-controls")}`,
       )!;
       row.hidden = !row.hidden;
       b.setAttribute("aria-expanded", String(!row.hidden));
       b.textContent = row.hidden ? "View calculation ⌄" : "Hide calculation ⌃";
+      b.setAttribute(
+        "aria-label",
+        `${row.hidden ? "View" : "Hide"} calculation for ${results[Number(b.dataset.detail)].worker} ${results[Number(b.dataset.detail)].period}`,
+      );
     }),
   );
+  el.querySelector("#previous-workers")?.addEventListener("click", () => {
+    workerPage--;
+    renderResults();
+    document.querySelector<HTMLElement>("#results-title")?.focus();
+  });
+  el.querySelector("#next-workers")?.addEventListener("click", () => {
+    workerPage++;
+    renderResults();
+    document.querySelector<HTMLElement>("#results-title")?.focus();
+  });
+  el.querySelectorAll<HTMLButtonElement>("[data-period-worker]").forEach(
+    (button) =>
+      button.addEventListener("click", () => {
+        periodPages.set(
+          button.dataset.periodWorker!,
+          Number(button.dataset.periodPage),
+        );
+        renderResults();
+      }),
+  );
+  document.querySelector("#screening-status")!.textContent =
+    `Screening complete. ${workers} workers, ${results.length} pay periods, ${issues} potential hourly shortfalls. All findings require review.`;
   el.querySelector("#clear")?.addEventListener("click", () => {
     results = [];
     confirmedPayroll = [];
@@ -341,6 +375,8 @@ function renderResults() {
     render();
   });
   el.querySelector("#recheck")?.addEventListener("click", () => {
+    workerPage = 0;
+    periodPages.clear();
     results = evaluate(confirmedPayroll);
     renderResults();
     document.querySelector("#recheck-status")!.textContent =
@@ -353,7 +389,27 @@ function renderResults() {
       "application/json;charset=utf-8",
     ),
   );
-  el.querySelector("#print")?.addEventListener("click", () => window.print());
+  el.querySelector("#print")?.addEventListener("click", () => {
+    const report = document.createElement("section");
+    report.className = "print-report";
+    // Every period is included, including records beyond the on-screen pagination.
+    report.innerHTML =
+      `<h1>WageLens screening report</h1><p>Rules ${rules.version} · Verified ${rules.lastVerified}. Based on user-supplied thresholds. Decision support, not legal advice.</p>` +
+      [...groups]
+        .map(([worker, rows]) =>
+          Array.from({ length: Math.ceil(rows.length / 20) }, (_, page) =>
+            workerMarkup(worker, rows, resultIndices, 1, page),
+          ).join(""),
+        )
+        .join("");
+    report.querySelectorAll("details").forEach((d) => (d.open = true));
+    report
+      .querySelectorAll<HTMLElement>("[hidden]")
+      .forEach((d) => (d.hidden = false));
+    document.body.append(report);
+    window.print();
+    report.remove();
+  });
   el.querySelector("#export")?.addEventListener("click", () => {
     const fields = [
       "worker_ref",
@@ -381,6 +437,9 @@ function renderResults() {
       r.status,
       r.ruleId,
       (r.pay / 100).toFixed(2),
+      r.inputs?.hoursWorked || "",
+      r.inputs?.hourlyRate || "",
+      r.inputs?.annualSalary || "",
       r.shortfallAmount ? (r.shortfallAmount / 100).toFixed(2) : "",
       r.explanation,
       r.suggestedAction,
@@ -401,11 +460,6 @@ function renderResults() {
     );
   });
 }
-function csvSafe(s: string) {
-  return (
-    '"' + (/^[=+\-@\t\r]/.test(s) ? "'" : "") + s.replaceAll('"', '""') + '"'
-  );
-}
 function download(
   content: string,
   name: string,
@@ -419,48 +473,95 @@ function download(
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function renderDoc() {
-  const source =
-    "https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-worker";
-  const docs: Record<string, [string, string]> = {
-    "/how-it-works": [
-      "A clearer path through payroll.",
-      "<p>Import an Excel, CSV or TSV file, or paste spreadsheet cells using pseudonymous worker references, map your columns, and review each finding. Supply the applicable annual requirement and hourly going rate yourself; WageLens does not select thresholds or occupation codes.</p><p>This research preview uses deterministic hourly screening and aligned-window arithmetic. Aligned 3-month and 12-week windows are screened where full history is supplied. Arbitrary boundaries, 17-week patterns, exceptions and reporting deadlines require further implementation and legal review.</p>" +
-        how(),
-    ],
-    "/rules": [
-      "The rules. In the open.",
-      `<p>Version ${rules.version} · Last verified ${rules.lastVerified} · Solicitor review pending.</p><h2>What this preview checks</h2><p>Basic pay compared with your supplied hourly rate × hours worked. Bonuses and other pay do not cover an hourly shortfall in this preview. Earlier CoS assignments and every overall finding require REVIEW.</p><h2>What needs further review</h2><p>Arbitrary window boundaries and 17-week salary patterns; deductions; unpaid leave; part periods; contractual frequencies; transitional cases and changing salary requirements. Aligned window arithmetic may show PASS or FAIL; it does not clear every possible boundary or exception. Every overall finding remains REVIEW.</p><h2>Primary sources</h2><ul><li><a href="${source}" target="_blank" rel="noreferrer">Appendix Skilled Worker, SW 14.1–14.3B</a></li><li><a href="https://assets.publishing.service.gov.uk/media/69e76a2ff766dcdcd05034ff/Sponsor-a-Skilled-Worker-04-26-v1.0_.pdf" target="_blank" rel="noreferrer">Sponsor guidance version 04/26, SK7–SK8</a></li><li><a href="https://www.gov.uk/government/publications/workers-and-temporary-workers-guidance-for-sponsors-part-3-sponsor-duties-and-compliance/workers-and-temporary-workers-guidance-for-sponsors-part-3-sponsor-duties-and-compliance-accessible" target="_blank" rel="noreferrer">Sponsor reporting duties, C1.15</a></li></ul><p>All currently listed rules are PRIMARY-CONFIRMED; implementation limitations still require REVIEW. Decision support, not legal advice.</p>`,
-    ],
-    "/privacy": [
-      "Your payroll stays yours.",
-      '<p>Payroll files and pasted cells are read and processed in browser memory. There is no account, backend, database, analytics, tracking cookie or persistent payroll storage in this application.</p><p>Names, NI numbers, addresses and other direct identifiers must be removed before import. Identifying columns are excluded from suggested matches and screening inputs. Header recognition cannot guarantee that selected cells contain no personal data, so confirmation is required. Digital PDF extraction uses readable text only; scans are unsupported.</p><p>Clear data or reload the page to discard imported data from application memory. Exported files are saved to your own device. External source links open GOV.UK only when you choose them.</p><p>The hosting provider may receive ordinary page-request metadata; it does not receive the contents of your payroll through this application. This portfolio demonstration is maintained by <a href="https://github.com/shaswatshukla" target="_blank" rel="noreferrer">shaswatshukla on GitHub</a>.</p><p><a href="#/verify">Verify browser-only processing →</a></p>',
-    ],
-    "/verify": [
-      "Trust you can inspect.",
-      "<ol><li>Open your browser’s developer tools and select Network.</li><li>Wait for the page to load, then clear the request log.</li><li>Choose a payroll file or paste spreadsheet cells, map columns, run screening and export a report.</li><li>No application request should contain the file, rows or findings. The digital PDF reader may fetch fixed local parser assets on first use. Those requests must contain no payroll data.</li></ol><p>During local development, Vite maintains a reload connection. Verify the built production version for launch assurance. Do not share screenshots or network logs that contain payroll.</p>",
-    ],
-    "/disclaimer": [
-      "Clarity, with the right context.",
-      "<p>WageLens is decision support, not legal advice. It cannot confirm that a business is compliant, will pass an audit, or is safe from enforcement.</p><p>The preview only screens a subset of payroll arithmetic against the values you enter. Every overall result is REVIEW. Rules may change, the inputs may be incomplete, and exceptions may require an immigration adviser’s judgment.</p><p>Do not use a potential shortfall as an automatic reporting decision. Review the applicable duties and circumstances with your adviser. This hosted portfolio demonstration is a research preview. A production compliance-service launch remains pending solicitor review and completion of the outstanding checks.</p>",
-    ],
-  };
   const entry = docs[route()] || [
     "This page is out of focus.",
-    '<p>We couldn’t find that page. <a href="#/">Return to the salary checker →</a></p>',
+    '<p>We couldn’t find that page. <a href="/">Return to the salary checker →</a></p>',
   ];
   shell(
     `<article class="document"><div class="eyebrow"><span></span> WAGELENS / ${esc(route().slice(1).toUpperCase())}</div><h1>${entry[0]}</h1>${entry[1]}</article>`,
   );
 }
-window.addEventListener("hashchange", () => {
+function updateMetadata() {
+  const meta = pageMeta[route()] || {
+    title: "Page not found | WageLens",
+    description: "Return to WageLens salary screening.",
+  };
+  document.title = meta.title;
+  document
+    .querySelector('meta[name="description"]')
+    ?.setAttribute("content", meta.description);
+  document
+    .querySelector('link[rel="canonical"]')
+    ?.setAttribute("href", siteURL + (route() === "/" ? "/" : route()));
+  for (const [key, value] of Object.entries({
+    "og:title": meta.title,
+    "og:description": meta.description,
+    "og:url": siteURL + (route() === "/" ? "/" : route()),
+    "twitter:title": meta.title,
+    "twitter:description": meta.description,
+  }))
+    document
+      .querySelector(`meta[property="${key}"],meta[name="${key}"]`)
+      ?.setAttribute("content", value);
+}
+function focusHeading() {
+  const heading = document.querySelector<HTMLElement>("h1");
+  if (heading) {
+    heading.tabIndex = -1;
+    heading.focus();
+  }
+}
+document.addEventListener("click", (event) => {
+  const anchor = (event.target as Element).closest<HTMLAnchorElement>(
+    "a[href]",
+  );
+  if (
+    !anchor ||
+    event.defaultPrevented ||
+    (event as MouseEvent).button !== 0 ||
+    (event as MouseEvent).ctrlKey ||
+    (event as MouseEvent).metaKey ||
+    (event as MouseEvent).shiftKey ||
+    (event as MouseEvent).altKey ||
+    anchor.target ||
+    anchor.hasAttribute("download")
+  )
+    return;
+  const target = new URL(anchor.href);
+  if (
+    target.origin !== location.origin ||
+    anchor.getAttribute("href")?.startsWith("#")
+  )
+    return;
+  event.preventDefault();
+  history.pushState({}, "", target.pathname + target.hash);
   render();
   window.scrollTo(0, 0);
+  const section = target.hash
+    ? document.getElementById(target.hash.slice(1))
+    : null;
+  if (section) {
+    section.tabIndex = -1;
+    section.scrollIntoView();
+    section.focus({ preventScroll: true });
+  } else focusHeading();
 });
+window.addEventListener("popstate", () => {
+  render();
+  focusHeading();
+});
+window.addEventListener("hashchange", () => {
+  if (location.hash.startsWith("#/")) {
+    history.replaceState({}, "", location.hash.slice(1));
+    render();
+    focusHeading();
+  }
+});
+if (location.hash.startsWith("#/"))
+  history.replaceState({}, "", location.hash.slice(1));
 render();
-
-// Warm the local Excel reader after the page can paint; payroll never enters this request.
-requestAnimationFrame(() => {
-  setTimeout(() => {
-    void preloadWorkbookTools().catch(() => {});
-  }, 0);
+matchMedia("(max-width: 650px)").addEventListener("change", (event) => {
+  document
+    .querySelectorAll<HTMLDetailsElement>(".detailed-table")
+    .forEach((d) => (d.open = !event.matches));
 });

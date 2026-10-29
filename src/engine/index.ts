@@ -24,6 +24,12 @@ export type Result = {
   suggestedAction: string;
   shortfallAmount?: number;
   pay: number;
+  inputs?: {
+    hoursWorked: string;
+    hourlyRate: string;
+    annualSalary: string;
+    otherPay: string;
+  };
   windowFinding?: TestFinding;
 };
 export function pence(value: string): number {
@@ -145,6 +151,12 @@ export function evaluateWorker(
       worker,
       period: `${r.pay_period_start} → ${r.pay_period_end}`,
       pay,
+      inputs: {
+        hoursWorked: r.hours_worked,
+        hourlyRate: r.going_rate_hourly_gbp,
+        annualSalary: r.required_annual_salary_gbp,
+        otherPay: r.other_pay_gbp,
+      },
       ruleId: "hourly",
       suggestedAction:
         "Confirm the applicable rates, deductions, leave and full payroll history with your adviser.",
