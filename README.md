@@ -1,29 +1,47 @@
-# WageLens
+# WageLens — pay-period salary screening for UK Skilled Worker sponsors
 
-**Live research preview:** [Open WageLens](https://wagelensuk.wluk.workers.dev/#/).
+**Research preview. Decision support, not legal advice.** This is a business-analysis portfolio case study about translating a changing rule into a transparent, privacy-first workflow. It is not a completed compliance checker or a Home Office-approved service.
 
-[![Verification](https://github.com/shaswatshukla/wagelensuk/actions/workflows/ci.yml/badge.svg)](https://github.com/shaswatshukla/wagelensuk/actions/workflows/ci.yml)
+## The problem
 
-![WageLens dark interface](docs/images/wagelens.webp)
+For relevant Certificates of Sponsorship assigned on or after 8 April 2026, the Skilled Worker rules require pay-period checks as well as annual salary checks. Appendix Skilled Worker paragraph SW 14.3B sets different periods for monthly and more frequent pay, and a 17-week rule for certain uneven working patterns. Sponsors also need to compare pay for every hour worked with the applicable going rate. [Home Office sponsor guidance](https://www.gov.uk/government/publications/sponsor-a-skilled-worker/workers-and-temporary-workers-sponsor-a-skilled-worker-accessible) · [Immigration Rules, Appendix Skilled Worker](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-worker)
 
-A privacy-first TypeScript portfolio project: local document recognition, conservative financial checks, accessible UX and browser-level privacy tests.
+## What I did as a business analyst
 
-**Recruiter walkthrough:** [engineering decisions and a two-minute demo](docs/portfolio.md).
+- Turned SW 14.3A–14.4 into a rules specification, assumptions and out-of-scope cases.
+- Mapped the payroll review workflow from import and field confirmation through calculation, explanation and export.
+- Wrote worked examples and acceptance criteria for monthly, more-frequent and uneven-pay scenarios.
+- Built a browser-only prototype that keeps payroll in the device, makes uncertain field matches visible, and shows the arithmetic behind a finding.
+- Recorded the current gaps rather than presenting uncertain results as legal conclusions.
 
+**Try the public baseline:** [Open WageLens](https://wagelensuk.wluk.workers.dev/#/) · **BA case study:** [Problem, stakeholders, requirements, risks and acceptance criteria](docs/ba-case-study.md) · **Two-minute walkthrough:** [Demo steps and engineering notes](docs/portfolio.md)
 
-A static Skilled Worker payroll screening website. Bold dark theme, browser-only Excel/CSV/TSV and pasted-cell imports, column mapping, hourly arithmetic, per-period findings, CSV export and print-to-PDF.
+> This public repository is the portfolio baseline. A separate private research repository contains newer work and its Vercel preview may require temporary access. Do not assume the public Worker demo and private Vercel preview are the same build.
 
-Excel workbooks support `.xlsx` and `.xls`, with explicit selection when multiple visible sheets exist. Formula cells require a values-only sheet to avoid trusting stale cached results. Text inputs accept CSV or tab-separated cells from Excel/Google Sheets. Maximum file size is 5 MB and maximum table size is 10,000 payroll rows. SheetJS is bundled locally from its official 0.20.3 distribution; there are no runtime CDN requests.
+## Scope at a glance
 
-Common payroll headings are matched automatically; title rows can be skipped, identifiers are excluded, and uncertain matches stay blank. The confirmation screen shows source headings and original values alongside editable extracted values, with per-row missing details and an explicit confirmation before screening. Unknown headings can be mapped manually or a different header row selected, without editing the original file. No CoS requirements or zero pay amounts are inferred.
+| Area | Status | What that means |
+|---|---|---|
+| Import and field review | Prototype done | Excel, CSV, TSV, pasted cells and supported digital PDFs; users review field matches and extracted values. A sample-data button is available on the first screen. |
+| Basic hourly screen | Partial | Basic pay is compared with actual hours and a supplied hourly rate. |
+| Aligned annual salary windows | Partial | The prototype screens aligned monthly and 12-week windows; arbitrary boundaries and all circumstances are not covered. |
+| 17-week uneven-pattern rule | Not implemented as a final check | The relevant pattern and pay must be assessed under the rules; use a qualified adviser. |
+| Final compliance verdict | Not implemented | Overall findings remain REVIEW. The prototype does not return a definitive PASS or FAIL. |
+| Occupation and salary requirements | Not selected by the public baseline | Confirm the SOC code and applicable salary option from the actual job and CoS. Do not infer them from job title or generic payroll columns. |
+| Legal exceptions and deadlines | Not complete | Deductions, transitional cases and other exceptions need further assessment. |
 
-Readable digital PDFs use a locally bundled PDF.js worker (at most 20 pages). Positioned tables and simple labelled payslips are supported as extraction suggestions. Scans/OCR, arbitrary Word documents, encrypted files and unreliable multipage payslip merging are unsupported. PDF layout extraction always needs human verification. See `docs/import-recognition.md`.
+A completed import is not a compliance verdict. Never use a WageLens result as the only basis for sponsor action.
 
-## Status
+## Two-minute demo
 
-**Research preview, not the completed salary checker.** Overall findings remain REVIEW. Complete aligned 3-month and 12-week windows are screened. Arbitrary boundary allocation, 17-week pattern assessment, legal exception declarations, deadline calculations and production infrastructure remain outstanding. The owner has authorised a hosted portfolio demonstration; the app must remain clearly labelled as a research preview. Decision support, not legal advice.
+1. Open the public baseline and choose **Try sample screening**.
+2. Inspect the sample’s possible hourly shortfall and expand the calculation.
+3. Open **How these findings are calculated** to see the rules and limitations.
+4. Export a report, then clear the sample.
 
-## Run
+No real employee payroll is needed for the walkthrough.
+
+## Run locally
 
 Node 22+ and pnpm:
 
@@ -35,21 +53,22 @@ pnpm coverage
 pnpm build
 ```
 
-Browser/privacy verification: `node scripts/browser-check.cjs` after building. It uses installed Edge on Windows; select another installed Chromium channel with `BROWSER_CHANNEL`. It saves screenshots, a print PDF, accessibility findings and Lighthouse output under ignored `test-results/`.
+The browser/privacy check is `node scripts/browser-check.cjs` after building. It uses installed Edge on Windows and saves artifacts under ignored `test-results/`.
 
-`dist/` is entirely static and portable. No application backend, database, cookies, analytics or remote fonts. Payroll lives in browser memory; no persistence. Exports stay on the device. Do not include names or NI numbers. Column checks cannot detect every identifier in cell contents.
+## Privacy and technical notes
 
-Rules: `src/rules/skilled-worker.json`; source analysis: `docs/rules-spec.md`; acceptance fixtures: `docs/worked-examples.md`. The dates shown in the UI describe research verification, not solicitor sign-off.
+The public baseline is a static TypeScript/Vite site. Payroll import, confirmation, calculations and exports run in the browser. There is no payroll database, account system or analytics. The project tests that payroll is not sent in network requests; ordinary page requests may still be logged by the hosting provider. Use worker references and avoid names or National Insurance numbers.
 
-The executable fixtures test the preview's conservative results; they do not certify all final worked-example window expectations. Money uses integer pence and BigInt comparisons for decimal hours; fractional minimum pence rounds upward when displaying potential gaps.
+Money comparisons use integer pence and rational arithmetic for fractional hours. The import flow shows source headings and values so users can correct extraction. Supported digital PDF extraction is approximate and requires checking the original document. Scanned PDFs/OCR and arbitrary Word documents are out of scope.
 
-## Privacy verification
+## Rules and evidence
 
-Serve the production build, clear the Network panel, then import, confirm, screen and export. No request may contain payroll data. Local parser modules and the PDF worker may load as fixed static assets; they have no document values in their URLs or request bodies. The browser test permits only exact known local asset URLs with GET and no body. External source pages open only on click. A host may log ordinary page loads. Add production HTTP headers before launch (see `public/_headers`).
+The public baseline stores a versioned research rules file at `src/rules/skilled-worker.json`. Its `lastVerified` date records the last source review; it is not a live Home Office feed and does not mean solicitor approval. Rule text can change, so check GOV.UK directly before relying on it.
 
-## Hosting and maintenance
+- [Appendix Skilled Worker](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-worker)
+- [Appendix Skilled Occupations](https://www.gov.uk/guidance/immigration-rules/immigration-rules-appendix-skilled-occupations)
+- [Sponsor a Skilled Worker guidance](https://www.gov.uk/government/publications/sponsor-a-skilled-worker/workers-and-temporary-workers-sponsor-a-skilled-worker-accessible)
 
-See [deployment and recovery](docs/deployment.md) for Cloudflare Workers static hosting, automated checks and the optional Oracle standby. The original source repository remains private; the deployed `wagelensuk` showcase repository is public. A hosted portfolio demonstration is authorised; a production compliance-service launch still requires solicitor review and completion of the outstanding work. No payroll backend is deployed.
+## Licence
 
-
-See [30 October review fixes and verification](docs/review-fixes.md) for theme, accessibility, calculation evidence, mobile cards, direct document URLs, file safeguards and performance measurements.
+No open-source licence is declared. All rights are reserved by default; viewing this public repository does not grant permission to reuse or redistribute its code. Ask the owner before reuse.
